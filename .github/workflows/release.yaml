@@ -1,0 +1,33 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.x"
+          check-latest: true
+      - name: Build assets andirelease
+        run: make bufrelease
+        env:
+          SKIP_MINISIGN: true
+      - name: Create a Release on GitHub
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            .build/release/buf/assets/*
