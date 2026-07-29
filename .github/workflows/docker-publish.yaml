@@ -15,11 +15,11 @@ on:
         type: boolean
         description: Publish the image to Docker Hub
         default: false
-permissions: read-all
+permissions:
+  packages: write
 jobs:
   docker:
     runs-on: ubuntu-latest
-    if: github.repository == 'bufbuild/buf'
     steps:
       - name: Validate SemVer
         run: |
@@ -33,27 +33,28 @@ jobs:
           fi
       - name: checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: refs/tags/v${{ github.event.inputs.version }}
       - name: setup-qemu
         uses: docker/setup-qemu-action@v4
         id: qemu
         with:
-          platforms: linux/386,linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/ppc64le,linux/s390x
+          platforms: linux/386,linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/loong64,linux/ppc64le,linux/riscv64,linux/s390x
       - name: setup-docker-buildx
         uses: docker/setup-buildx-action@v4
       - name: login-docker
         uses: docker/login-action@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
       - name: docker-meta
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: |
-            bufbuild/buf
+            ghcr.io/loong64/bufbuild/buf
           tags: |
             type=raw,value=latest,enable=${{ github.event.inputs.latest }}
             type=semver,pattern={{major}},value=v${{ github.event.inputs.version }}
@@ -76,7 +77,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
       - name: docker-test
         run: |
-          OUTPUT=$(docker run --rm bufbuild/buf:${{ github.event.inputs.version }} --version)
+          OUTPUT=$(docker run --rm ghcr.io/loong64/bufbuild/buf:${{ github.event.inputs.version }} --version)
           if [ "$OUTPUT" == "${{ github.event.inputs.version }}" ]; then
             echo "Version matches"
           else
