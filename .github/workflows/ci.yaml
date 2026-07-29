@@ -7,7 +7,8 @@ on:
   pull_request:
 # Prevent writing to the repository using the CI token.
 # Ref: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#permissions
-permissions: read-all
+permissions:
+  packages: write
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -46,6 +47,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buf-golangci-lint-
       - name: make-lint
+        if: github.repository == 'bufbuild/buf'
         run: make lint
         env:
           # actions/setup-go@v6 exports GOTOOLCHAIN=local via $GITHUB_ENV; override at the
@@ -89,7 +91,7 @@ jobs:
     # 2. The repository is not a fork, i.e. it will only run on the official bufbuild/buf
     # 3. The workflow run is trigged by main branch OR a tag with v prefix
     # See https://github.com/bufbuild/buf/pull/289/files#r596207623 for the discussion
-    if: ${{ github.repository == 'bufbuild/buf' && (github.ref == 'refs/heads/main' || contains(github.ref, 'refs/tags/v')) }}
+    if: ${{ github.ref == 'refs/heads/main' || contains(github.ref, 'refs/tags/v') }}
     steps:
       # qemu is used when executing things like `apk` in the final build
       # stage which must execute on the target platform. We currently do
@@ -100,20 +102,21 @@ jobs:
         id: qemu
         with:
           # alpine image doesn't support linux/riscv64
-          platforms: linux/386,linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/ppc64le,linux/s390x
+          platforms: linux/386,linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/loong64,linux/ppc64le,linux/riscv64,linux/s390x
       - name: setup-docker-buildx
         uses: docker/setup-buildx-action@v4
       - name: login-docker
         uses: docker/login-action@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
       - name: docker-meta
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: |
-            bufbuild/buf
+            ghcr.io/loong64/bufbuild/buf
           tags: |
             type=edge,branch=main
             type=semver,pattern={{version}}
